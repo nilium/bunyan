@@ -1,5 +1,4 @@
 use crate::{Format, NamedLogLevel};
-use chrono::{DateTime, SecondsFormat, Utc};
 use colored::Colorize;
 use itertools::Itertools;
 use serde::Serialize;
@@ -7,6 +6,8 @@ use serde_json::ser::PrettyFormatter;
 use serde_json::Serializer;
 use std::borrow::Cow;
 use std::convert::TryFrom;
+use time::format_description::well_known::Rfc3339;
+use time::OffsetDateTime;
 
 #[derive(serde::Deserialize)]
 pub struct LogRecord<'a> {
@@ -26,7 +27,8 @@ pub struct LogRecord<'a> {
     #[serde(rename = "pid")]
     pub process_identifier: u32,
     /// The time of the event captured by the log in [ISO 8601 extended format](http://en.wikipedia.org/wiki/ISO_8601).
-    pub time: DateTime<Utc>,
+    #[serde(with = "time::serde::iso8601")]
+    pub time: OffsetDateTime,
     /// Log message.
     #[serde(rename = "msg")]
     pub message: Cow<'a, str>,
@@ -38,9 +40,14 @@ pub struct LogRecord<'a> {
 impl<'a> LogRecord<'a> {
     pub fn format(&self, _format: Format) -> String {
         let level = format_level(self.level);
+        let time = self
+            .time
+            .format(&Rfc3339)
+            .unwrap_or_else(|_err| "0000-01-01T00:00:00.00Z".into());
         let formatted = format!(
             "[{}] {}: {}/{} on {}: {}{}",
-            self.time.to_rfc3339_opts(SecondsFormat::Millis, true),
+            time,
+            // self.time.to_rfc3339_opts(SecondsFormat::Millis, true),
             level,
             self.name,
             self.process_identifier,
